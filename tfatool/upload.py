@@ -1,6 +1,7 @@
 import math
 import os
 import arrow
+import logging
 
 from functools import partial
 
@@ -9,6 +10,9 @@ from .info import DEFAULT_REMOTE_DIR, DEFAULT_MASTERCODE, URL
 from .info import WriteProtectMode, Upload, ResponseCode
 from requests import RequestException
 
+logger = logging.getLogger(__name__)
+def set_loglevel(level):
+    logger.setLevel(level)
 
 def upload_file(local_path: str, url=URL, remote_dir=DEFAULT_REMOTE_DIR):
     set_write_protect(WriteProtectMode.on, url=url)

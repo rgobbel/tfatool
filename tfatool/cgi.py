@@ -8,7 +8,8 @@ from .info import URL
 
 logger = logging.getLogger(__name__)
 session = requests.session()
-
+def set_loglevel(level):
+    logger.setLevel(level)
 
 class Entrypoint(str, Enum):
     command = "command.cgi"
@@ -27,7 +28,7 @@ def request(method, entrypoint: Entrypoint, url=URL,
     prepared_req = prep_request(method, entrypoint, url=url,
                                 req_kwargs=req_kwargs, **params)
     send_kwargs = send_kwargs or {}
-    return send(prepared_request, **send_kwargs)
+    return send(prepared_req, **send_kwargs)
 
 
 def prep_request(method, entrypoint, url=URL, req_kwargs=None, **params):

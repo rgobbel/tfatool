@@ -4,6 +4,9 @@ from . import cgi
 from .info import URL, DEFAULT_MASTERCODE
 from .info import WifiMode, WifiModeOnBoot, ModeValue, DriveMode, Config
 
+logger = logging.getLogger(__name__)
+def set_loglevel(level):
+    logger.setLevel(level)
 
 def config(param_map, mastercode=DEFAULT_MASTERCODE):
     """Takes a dictionary of {Config.key: value} and

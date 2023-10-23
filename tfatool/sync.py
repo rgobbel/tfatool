@@ -17,8 +17,9 @@ from .info import URL, DEFAULT_REMOTE_DIR
 from .info import RawFileInfo, SimpleFileInfo
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
+# logger.setLevel(logging.INFO)
+def set_loglevel(level):
+    logger.setLevel(level)
 
 # Python 3.4 compatibility via scandir backport
 if hasattr(os, "scandir"):
@@ -41,7 +42,8 @@ class Monitor:
     in separate threads"""
 
     def __init__(self, *filters, local_dir=".",
-                 remote_dir=DEFAULT_REMOTE_DIR):
+                 remote_dir=DEFAULT_REMOTE_DIR, url=URL):
+        self._url = url
         self._filters = filters
         self._local_dir = local_dir
         self._remote_dir = remote_dir
@@ -56,7 +58,7 @@ class Monitor:
 
     def _run_sync(self, method):
         files = method(*self._filters, local_dir=self._local_dir,
-                       remote_dir=self._remote_dir)
+                       remote_dir=self._remote_dir, url=self._url)
         while self.running.is_set():
             _, new = next(files)
             if not new:
@@ -81,7 +83,7 @@ class Monitor:
 
 
 def up_down_by_arrival(*filters, local_dir=".",
-                       remote_dir=DEFAULT_REMOTE_DIR):
+                       remote_dir=DEFAULT_REMOTE_DIR, url=URL):
     """Monitors a local directory and a remote FlashAir directory and
     generates sets of new files to be uploaded or downloaded.
     Sets to upload are generated in a tuple
@@ -89,7 +91,7 @@ def up_down_by_arrival(*filters, local_dir=".",
     are generated in a tuple like (Direction.down, {...}). The generator yields
     before each upload or download actually takes place."""
     local_monitor = watch_local_files(*filters, local_dir=local_dir)
-    remote_monitor = watch_remote_files(*filters, remote_dir=remote_dir)
+    remote_monitor = watch_remote_files(*filters, remote_dir=remote_dir, url=url)
     _, lfile_set = next(local_monitor)
     _, rfile_set = next(remote_monitor)
     _notify_sync_ready(len(lfile_set), local_dir, remote_dir)
@@ -100,7 +102,7 @@ def up_down_by_arrival(*filters, local_dir=".",
         local_arrivals = {f for f in new_local if f.filename not in processed}
         yield Direction.up, local_arrivals
         if local_arrivals:
-            new_names.update(f.filename for f in local_arrivals)
+            new_local.update(f.filename for f in local_arrivals)
             _notify_sync(Direction.up, local_arrivals)
             up_by_files(local_arrivals, remote_dir)
             _notify_sync_ready(len(local_set), local_dir, remote_dir)
@@ -108,7 +110,7 @@ def up_down_by_arrival(*filters, local_dir=".",
         remote_arrivals = {f for f in new_remote if f.filename not in processed}
         yield Direction.down, remote_arrivals
         if remote_arrivals:
-            new_names.update(f.filename for f in remote_arrivals)
+            new_local.update(f.filename for f in remote_arrivals)
             _notify_sync(Direction.down, remote_arrivals)
             yield Direction.down, remote_arrivals
             down_by_files(remote_arrivals, local_dir)
@@ -180,23 +182,37 @@ def down_by_name(*filters, remote_dir=DEFAULT_REMOTE_DIR, local_dir=".", count=1
 
 
 def _sync_remote_file(local_dir, remote_file_info):
+    logger.debug(f'{remote_file_info=}')
     local = Path(local_dir, remote_file_info.filename)
     local_name = str(local)
-    remote_size = remote_file_info.size
-    if local.exists():
-        local_size = local.stat().st_size
-        if local.stat().st_size == remote_size:
-            logger.info(
-                "Skipping '{}': already exists locally".format(
-                local_name))
+    if remote_file_info.attribute.directory:
+        if local.exists():
+            if not local.is_dir():
+                logger.warning(f'Replacing local file {local_name} with a directory')
+                os.remove(local_name)
+                os.mkdir(local_name)
         else:
-            logger.warning(
-                "Removing {}: local size {} != remote size {}".format(
-                local_name, local_size, remote_size))
-            os.remove(local_name)
-            _stream_to_file(local_name, remote_file_info)
+            os.mkdir(local_name)
+        remote_children = command.list_files(remote_dir=remote_file_info.path)
+        for child in remote_children:
+            logger.debug(f'{local=},{child=}')
+            _sync_remote_file(local, child)
     else:
-        _stream_to_file(local_name, remote_file_info)
+        remote_size = remote_file_info.size
+        if local.exists():
+            local_size = local.stat().st_size
+            if local.stat().st_size == remote_size:
+                logger.info(
+                    "Skipping '{}': already exists locally".format(
+                    local_name))
+            else:
+                logger.warning(
+                    "Removing {}: local size {} != remote size {}".format(
+                    local_name, local_size, remote_size))
+                os.remove(local_name)
+                _stream_to_file(local_name, remote_file_info)
+        else:
+            _stream_to_file(local_name, remote_file_info)
 
 
 def _stream_to_file(local_name, fileinfo):
@@ -266,7 +282,7 @@ def watch_local_files(*filters, local_dir="."):
         new_files = set(list_local())
 
 
-def watch_remote_files(*filters, remote_dir="."):
+def watch_remote_files(*filters, remote_dir=".", url=URL):
     command.memory_changed()  # clear change status to start
     list_remote = partial(command.list_files,
                           *filters, remote_dir=remote_dir)

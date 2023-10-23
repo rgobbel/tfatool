@@ -10,7 +10,8 @@ from .info import FileInfo, RawFileInfo
 
 
 logger = logging.getLogger(__name__)
-
+def set_loglevel(level):
+    logger.setLevel(level)
 
 ##################
 # command.cgi API
@@ -100,6 +101,7 @@ def _split_file_list(text):
             timeinfo = _decode_time(date_val, time_val)
             attribute = _decode_attribute(attr_val)
             path = str(PurePosixPath(directory, filename))
+            # print(f'{path=},{directory=},{filename=},{size=},{timeinfo=},{attribute=}')
             yield FileInfo(directory, filename, path,
                            size, attribute, timeinfo)
 
@@ -133,12 +135,14 @@ def _decode_time(date_val: int, time_val: int):
 
 
 AttrInfo = namedtuple(
-    "AttrInfo", "archive directly volume system_file hidden_file read_only")
+    "AttrInfo", "archive directory volume system_file hidden_file read_only")
 
 def _decode_attribute(attr_val: int):
     bit_positions = reversed(range(6))
     bit_flags = [bool(attr_val & (1 << bit)) for bit in bit_positions]
-    return AttrInfo(*bit_flags)
+    result = AttrInfo(*bit_flags)
+    # print(f'attributes:{result}')
+    return result
 
 
 ########################################

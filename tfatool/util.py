@@ -1,8 +1,12 @@
 import arrow
+import logging
 
 from itertools import groupby
 from operator import attrgetter, itemgetter
 
+logger = logging.getLogger(__name__)
+def set_loglevel(level):
+    logger.setLevel(level)
 
 def parse_datetime(datetime_input):
     """The arrow library is sadly not good enough to parse

@@ -34,7 +34,7 @@ def test_upload_delete():
 
 def test_list_files():
     files = command.list_files()
-    raw_files = command.list_files()
+    raw_files = command.list_files_raw()
     same_attrs = "filename directory size".split()
     for n, (f, r) in enumerate(zip(files, raw_files)):
         assert all(getattr(f, n) == getattr(r, n) for n in same_attrs)

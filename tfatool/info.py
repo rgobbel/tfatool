@@ -1,10 +1,15 @@
 from enum import IntEnum, Enum
 from collections import namedtuple
+import logging
 
 
-URL = "http://flashair/"
+URL = "http://flashair.local/"
 DEFAULT_REMOTE_DIR = "/DCIM/100__TSB"
 DEFAULT_MASTERCODE = "BEEFBEEFBEEF"
+
+logger = logging.getLogger(__name__)
+def set_loglevel(level):
+    logger.setLevel(level)
 
 
 FileInfo = namedtuple(
